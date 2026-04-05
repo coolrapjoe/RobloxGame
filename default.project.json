@@ -26,9 +26,15 @@
     "StarterPack": {
       "$path": "src/StarterPack"
     },
-    "StarterPlayer": {
-      "$path": "src/StarterPlayer"
-    },
+"StarterPlayer": {
+  "$className": "StarterPlayer",
+  "StarterPlayerScripts": {
+    "$path": "src/StarterPlayer/StarterPlayerScripts"
+  },
+  "StarterCharacterScripts": {
+    "$path": "src/StarterPlayer/StarterCharacterScripts"
+  }
+},
     "SoundService": {
       "$properties": {
         "RespectFilteringEnabled": true

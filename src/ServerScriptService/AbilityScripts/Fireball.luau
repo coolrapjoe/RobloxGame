@@ -1,7 +1,6 @@
 -- ServerScriptService/AbilityScripts/Fireball
 -- Standard signature: Cast(player, shotId, originPos, aimPos)
 -- Fireball direction is FLAT (yaw only), so looking up/down doesn't change travel direction.
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
