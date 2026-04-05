@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:/RobloxGame/src -type f -name *.lua -o -name *.ts -o -name *.js)"
+    ]
+  }
+}
