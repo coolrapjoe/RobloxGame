@@ -44,19 +44,22 @@ local function getHrpCFrame(): CFrame?
 	return hrp and hrp.CFrame or nil
 end
 
-local function getAimPosFromOrigin(originPos: Vector3, maxDist: number): Vector3
+local function getAimPosFromOrigin(_originPos: Vector3, maxDist: number): Vector3
+	-- Raycast from the camera centre outward so the aim point reflects exactly
+	-- where the crosshair is pointing, including vertical angle.
+	local rayStart = camera.CFrame.Position
+	local dir = camera.CFrame.LookVector * maxDist
+
 	local char = player.Character
 	if not char then
-		return originPos + (camera.CFrame.LookVector * maxDist)
+		return rayStart + dir
 	end
 
-	local dir = camera.CFrame.LookVector * maxDist
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Blacklist
 	params.FilterDescendantsInstances = { char }
 	params.IgnoreWater = true
 
-	local rayStart = originPos + Vector3.new(0, 2, 0)
 	local r = workspace:Raycast(rayStart, dir, params)
 	return r and r.Position or (rayStart + dir)
 end
@@ -198,6 +201,11 @@ abilityPredict.OnClientEvent:Connect(function(abilityName, ownerUserId, shotId, 
 	if typeof(shotId) ~= "string" then return end
 	if typeof(originPos) ~= "Vector3" then return end
 	if typeof(aimPos) ~= "Vector3" then return end
+	-- Skip our own shots. The local player's predictions are spawned in InputBegan before
+	-- the server call is even sent, so this broadcast is always redundant for us. Worse,
+	-- if our predicted brick already hit something and cleaned up, this would spawn a
+	-- second phantom brick.
+	if ownerUserId == player.UserId then return end
 	spawnPredictedBrick(ownerUserId, shotId, originPos, aimPos)
 end)
 
@@ -205,7 +213,7 @@ end)
 -- Fireball prediction (owner only) — moves and collides like the server
 -- ============================================================
 
-local FIREBALL_CD = 2
+local FIREBALL_CD = 1  -- must match server COOLDOWN in Fireball.luau
 local nextFireballAt = 0
 
 local PRED_START_SPEED = 50
@@ -235,14 +243,12 @@ local function ensurePrimaryPart(m: Model)
 end
 
 local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos: Vector3): Model?
-	-- Use flat (yaw-only) direction to match server behaviour
+	-- Full 3D direction from the character origin toward the camera aim point.
 	local d = aimPos - originPos
-	local flat = Vector3.new(d.X, 0, d.Z)
-	if flat.Magnitude < 0.01 then
-		local look = camera.CFrame.LookVector
-		flat = Vector3.new(look.X, 0, look.Z)
+	if d.Magnitude < 0.01 then
+		d = camera.CFrame.LookVector
 	end
-	local dir = (flat.Magnitude < 0.01) and Vector3.new(0, 0, -1) or flat.Unit
+	local dir = d.Unit
 
 	local startPos = originPos + Vector3.new(0, 2, 0) + dir * 4
 	local ball = fireballTemplate:Clone()
@@ -403,11 +409,22 @@ workspace.DescendantAdded:Connect(function(inst)
 		local shotId = inst:GetAttribute("ShotId")
 		if typeof(shotId) ~= "string" then return end
 
+		-- Hide any children that replicate in after the initial hide call.
+		-- DescendantAdded fires for the Model before its children have arrived,
+		-- so GetDescendants() may be empty at that point.
+		local lateHideConn = inst.DescendantAdded:Connect(function(d)
+			if d:IsA("BasePart") then
+				d.LocalTransparencyModifier = 1
+				d.CastShadow = false
+			end
+		end)
+
 		local predicted = predictedFireballById[shotId]
 		if predicted and predicted.Parent then
 			-- Predicted still alive: swap server ball to its position
 			hideModelLocal(inst, true)
 			task.defer(function()
+				lateHideConn:Disconnect()
 				if not (inst and inst.Parent) then return end
 				if not (predicted and predicted.Parent) then
 					hideModelLocal(inst, false)
@@ -421,7 +438,9 @@ workspace.DescendantAdded:Connect(function(inst)
 				hideModelLocal(inst, false)
 			end)
 		else
-			-- Predicted already hit something and died — suppress the server ball visually
+			-- No predicted (server fired a shot the client didn't predict, or predicted
+			-- already died). Suppress the server ball visually; lateHideConn stays active
+			-- to catch late-replicating children.
 			hideModelLocal(inst, true)
 		end
 	end
@@ -482,13 +501,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		local now = os.clock()
 		if now >= nextBrickPredictAt then
 			nextBrickPredictAt = now + BRICK_PREDICT_CD
+			warn("[BrickClient] PREDICT allowed  nextAt=" .. string.format("%.3f", nextBrickPredictAt))
 			spawnPredictedBrick(player.UserId, shotId, originPos, aimPos)
+		else
+			warn("[BrickClient] PREDICT blocked  remaining=" .. string.format("%.2f", nextBrickPredictAt - now) .. "s")
 		end
 	elseif moveName == "Fireball" then
 		local now = os.clock()
 		if now >= nextFireballAt then
 			nextFireballAt = now + FIREBALL_CD
+			warn("[FireballClient] PREDICT allowed  nextAt=" .. string.format("%.3f", nextFireballAt))
 			spawnPredictedFireball(shotId, originPos, aimPos)
+		else
+			warn("[FireballClient] PREDICT blocked  remaining=" .. string.format("%.2f", nextFireballAt - now) .. "s")
 		end
 	end
 

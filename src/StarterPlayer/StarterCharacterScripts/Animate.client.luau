@@ -552,7 +552,7 @@ game:GetService("Players").LocalPlayer.Chatted:connect(function(msg)
 
 end)
 
--- emote bindable hook
+--[[ emote bindable hook
 script:WaitForChild("PlayEmote").OnInvoke = function(emote)
 	-- Only play emotes when idling
 	if pose ~= "Standing" then
@@ -568,6 +568,8 @@ script:WaitForChild("PlayEmote").OnInvoke = function(emote)
 	-- Return false to indicate that the emote could not be played
 	return false
 end
+]]
+
 -- main program
 
 -- initialize to idle

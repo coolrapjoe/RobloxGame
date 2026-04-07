@@ -6,9 +6,14 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local DEBUG = false
+local DEBUG = true
 local function sfb(...)
 	if DEBUG then
+		local parts = { "[Fireball]" }
+		for _, v in ipairs({ ... }) do
+			parts[#parts + 1] = tostring(v)
+		end
+		warn(table.concat(parts, " "))
 	end
 end
 
@@ -33,6 +38,9 @@ local HIT_BURST_TIME = 0.14
 
 local FIRE_SLOW_TIME = 0.25
 local FIRE_SLOW_MULT = 0.5
+
+-- Wall-hit smoke poof
+local SMOKE_EMIT_COUNT = 20   -- particles burst on env hit
 
 local MAX_AIM_DIST = 600
 
@@ -68,14 +76,12 @@ local function clampAim(origin: Vector3, aim: Vector3): Vector3
 	return aim
 end
 
-local function flatDirFromAim(origin: Vector3, aim: Vector3, fallbackLook: Vector3): Vector3
+local function dirFromAim(origin: Vector3, aim: Vector3, fallbackLook: Vector3): Vector3
 	local d = aim - origin
-	local flat = Vector3.new(d.X, 0, d.Z)
-	if flat.Magnitude < 0.01 then
-		local f = Vector3.new(fallbackLook.X, 0, fallbackLook.Z)
-		return (f.Magnitude < 0.01) and Vector3.new(0, 0, -1) or f.Unit
+	if d.Magnitude < 0.01 then
+		return (fallbackLook.Magnitude > 0.01) and fallbackLook.Unit or Vector3.new(0, 0, -1)
 	end
-	return flat.Unit
+	return d.Unit
 end
 
 local function findHumanoidFromHit(hitInst: Instance): Humanoid?
@@ -144,7 +150,7 @@ end
 
 local function hitWoosh(m: Model)
 	for _, inst in ipairs(m:GetDescendants()) do
-		if inst:IsA("ParticleEmitter") then
+		if inst:IsA("ParticleEmitter") and inst.Name ~= "Smoke" then
 			local pe = inst :: ParticleEmitter
 			local oldSize = pe.Size
 			local oldSpeed = pe.Speed
@@ -228,7 +234,6 @@ end
 local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos: any)
 	local char, hum, hrp = getAliveCharacter(player)
 	if not char then return end
-	if isOnCooldown(player, "Fireball", COOLDOWN) then return end
 
 	applyFireSlow(hum)
 
@@ -239,10 +244,10 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		clientPos = serverPos
 	end
 
-	-- FLAT direction from aim
+	-- Full 3D direction toward the camera aim point (preserves vertical angle)
 	local fallbackLook = hrp.CFrame.LookVector
 	local aim = (typeof(aimPos) == "Vector3") and clampAim(clientPos, aimPos) or (clientPos + fallbackLook * 30)
-	local dir = flatDirFromAim(clientPos, aim, fallbackLook)
+	local dir = dirFromAim(clientPos, aim, fallbackLook)
 
 	local startPos = clientPos + Vector3.new(0, 2, 0) + dir * 4
 
@@ -277,12 +282,14 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 	params.FilterDescendantsInstances = { char, ball }
 	params.IgnoreWater = true
 
-	local hitboxOffset = ball:GetPivot():ToObjectSpace(hitbox.CFrame)
+	local hitboxOffset  = ball:GetPivot():ToObjectSpace(hitbox.CFrame)
+	local primaryOffset = ball:GetPivot():ToObjectSpace(primary.CFrame)
 
 	local speed = START_SPEED
 	local alive = true
 	local elapsed = 0
-	local lastHitboxCF = (ball:GetPivot() * hitboxOffset)
+	local lastHitboxCF  = ball:GetPivot() * hitboxOffset
+	local lastPrimaryCF = ball:GetPivot() * primaryOffset
 
 	local braking = false
 	local brakeT = 0
@@ -345,37 +352,103 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 			end
 		end
 
-		local nextPos = pivotCF.Position + dir * step
-		local nextPivotCF = CFrame.new(nextPos, nextPos + dir)
-		local nextHitboxCF = nextPivotCF * hitboxOffset
+		local nextPos       = pivotCF.Position + dir * step
+		local nextPivotCF   = CFrame.new(nextPos, nextPos + dir)
+		local nextHitboxCF  = nextPivotCF * hitboxOffset
+		local nextPrimaryCF = nextPivotCF * primaryOffset
 
-		local moveVec = nextHitboxCF.Position - lastHitboxCF.Position
-		local result = workspace:Blockcast(lastHitboxCF, hitbox.Size, moveVec, params)
+		-- Hitbox cast: only used to detect player hits (enlarged area for leniency).
+		local hitboxMove = nextHitboxCF.Position - lastHitboxCF.Position
+		local hitboxResult = workspace:Blockcast(lastHitboxCF, hitbox.Size, hitboxMove, params)
 
-		if result then
+		local playerHit: Humanoid? = nil
+		if hitboxResult then
+			local targetHum = findHumanoidFromHit(hitboxResult.Instance)
+			if targetHum and targetHum ~= hum and targetHum.Health > 0 then
+				playerHit = targetHum
+			end
+		end
+
+		-- Primary-part cast: used to detect environment/wall hits.
+		-- The hitbox is intentionally larger than the visual fireball, so we only
+		-- destroy on geometry if the actual fireball part would have hit it too.
+		local envHit = false
+		local envHitPos: Vector3? = nil
+		if not playerHit then
+			local primaryMove = nextPrimaryCF.Position - lastPrimaryCF.Position
+			local primaryResult = workspace:Blockcast(lastPrimaryCF, primary.Size, primaryMove, params)
+			if primaryResult then
+				local targetHum = findHumanoidFromHit(primaryResult.Instance)
+				if targetHum and targetHum ~= hum and targetHum.Health > 0 then
+					-- Primary part hit a player (hitbox must have grazed geometry first).
+					playerHit = targetHum
+				else
+					envHit = true
+					envHitPos = primaryResult.Position
+				end
+			end
+		end
+
+		if playerHit or envHit then
 			alive = false
 			if conn then conn:Disconnect() end
 
-			sfb("hit", "shotId=", shotId, "hit=", result.Instance:GetFullName())
-
-			local targetHum = findHumanoidFromHit(result.Instance)
-			local hitAPlayer = (targetHum and targetHum ~= hum and targetHum.Health > 0)
-
-			if hitAPlayer then
-				targetHum:TakeDamage(DAMAGE)
+			if playerHit then
+				sfb("hit player", "shotId=", shotId, "hum=", playerHit:GetFullName())
+				playerHit:TakeDamage(DAMAGE)
 				hitWoosh(ball)
 				task.delay(HIT_FLASH_TIME, function()
 					if ball and ball.Parent then dieWithParticlesAndDestroy() end
 				end)
 			else
+				sfb("hit env", "shotId=", shotId)
+				-- Clone the smoke object onto a stationary host at the hit point so
+				-- the poof stays in place while the fireball fades out.
+				local smokeObj = ball:FindFirstChild("Smoke", true)
+				if smokeObj and envHitPos then
+					local host = Instance.new("Part")
+					host.Anchored     = true
+					host.CanCollide   = false
+					host.CanTouch     = false
+					host.CanQuery     = false
+					host.Transparency = 1
+					host.Size         = Vector3.new(1, 1, 1)
+					-- Identity CFrame keeps the part Y-up so Top = upward
+					host.CFrame       = CFrame.new(envHitPos)
+					host.Parent       = workspace
+
+					local maxLife = 0
+					local sources = smokeObj:IsA("ParticleEmitter") and { smokeObj } or smokeObj:GetDescendants()
+					for _, pe in ipairs(sources) do
+						if pe:IsA("ParticleEmitter") then
+							local cloned = pe:Clone()
+							-- Disabled = no continuous stream; Emit() fires a clean one-shot
+							-- burst so particles fade out naturally and the host can be
+							-- destroyed without cutting anything off mid-life.
+							cloned.Enabled          = false
+							cloned.EmissionDirection = Enum.NormalId.Top
+							cloned.Parent           = host
+							cloned.Size = NumberSequence.new(5,8)
+							cloned.Speed = NumberRange.new(11)
+							cloned.SpreadAngle = Vector2.new(-25,25)
+							cloned:Emit(SMOKE_EMIT_COUNT)
+							if cloned.Lifetime.Max > maxLife then maxLife = cloned.Lifetime.Max end
+						end
+					end
+
+					task.delay(maxLife + 0.5, function()
+						if host and host.Parent then host:Destroy() end
+					end)
+				end
 				dieWithParticlesAndDestroy()
 			end
 			return
 		end
 
-		pivotCF = nextPivotCF
+		pivotCF     = nextPivotCF
 		ball:PivotTo(pivotCF)
-		lastHitboxCF = nextHitboxCF
+		lastHitboxCF  = nextHitboxCF
+		lastPrimaryCF = nextPrimaryCF
 	end)
 end
 
@@ -386,21 +459,24 @@ end)
 local Fireball = {}
 
 function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
-	-- if on cooldown / dead / etc, DON'T fire and return false
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 	if not hum or not hrp or hum.Health <= 0 then
-		return false
-	end
-	if isOnCooldown(player, "Fireball", COOLDOWN) then
+		sfb("BLOCKED dead/no-char", player.Name)
 		return false
 	end
 
-	-- we "reserved" the cooldown above, so call the original spawner
-	-- but we must avoid it cooldown-checking again, so refund the cooldown it just set:
+	-- Single authoritative cooldown check and set. Never reset after this.
 	cooldowns[player] = cooldowns[player] or {}
-	cooldowns[player]["Fireball"] = 0
+	local now = os.clock()
+	local readyAt = cooldowns[player]["Fireball"] or 0
+	if now < readyAt then
+		sfb("BLOCKED cooldown", player.Name, "remaining=" .. string.format("%.2f", readyAt - now) .. "s")
+		return false
+	end
+	cooldowns[player]["Fireball"] = now + COOLDOWN
+	sfb("FIRE allowed", player.Name, "nextReadyAt=" .. string.format("%.3f", now + COOLDOWN))
 
 	spawnFireball(player, shotId, originPos, aimPos)
 	return true
