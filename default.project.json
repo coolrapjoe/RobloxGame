@@ -4,8 +4,8 @@
     "$className": "DataModel",
     "Lighting": {
       "$properties": {
-        "Brightness": 2,
         "GlobalShadows": true,
+        "Brightness": 2,
         "Outlines": false,
         "Technology": "Voxel",
         "Ambient": [0, 0, 0]
@@ -20,24 +20,24 @@
     "ServerStorage": {
       "$path": "src/ServerStorage"
     },
+    "SoundService": {
+      "$properties": {
+        "RespectFilteringEnabled": true
+      }
+    },
     "StarterGui": {
       "$path": "src/StarterGui"
     },
     "StarterPack": {
       "$path": "src/StarterPack"
     },
-"StarterPlayer": {
-  "$className": "StarterPlayer",
-  "StarterPlayerScripts": {
-    "$path": "src/StarterPlayer/StarterPlayerScripts"
-  },
-  "StarterCharacterScripts": {
-    "$path": "src/StarterPlayer/StarterCharacterScripts"
-  }
-},
-    "SoundService": {
-      "$properties": {
-        "RespectFilteringEnabled": true
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterCharacterScripts": {
+        "$path": "src/StarterPlayer/StarterCharacterScripts"
+      },
+      "StarterPlayerScripts": {
+        "$path": "src/StarterPlayer/StarterPlayerScripts"
       }
     },
     "Workspace": {

@@ -169,9 +169,28 @@ if animator then
 end
 
 
-for name, fileList in pairs(animNames) do 
+for name, fileList in pairs(animNames) do
 	configureAnimationSet(name, fileList)
-end	
+end
+
+-- Pre-load animation tracks for the most-used states so the first play is instant.
+local preloadCache: {[Animation]: AnimationTrack} = {}
+do
+	local animator = Humanoid:FindFirstChildOfClass("Animator")
+	if animator then
+		for _, animName in ipairs({"idle", "walk", "run", "jump", "fall"}) do
+			local set = animTable[animName]
+			if set then
+				for i = 1, set.count do
+					local entry = set[i]
+					if entry and entry.anim and not preloadCache[entry.anim] then
+						preloadCache[entry.anim] = animator:LoadAnimation(entry.anim)
+					end
+				end
+			end
+		end
+	end
+end
 
 -- ANIMATION
 
@@ -204,7 +223,9 @@ function stopAllAnimations()
 
 	if (currentAnimTrack ~= nil) then
 		currentAnimTrack:Stop()
-		currentAnimTrack:Destroy()
+		if not preloadCache[currentAnimInstance] then
+			currentAnimTrack:Destroy()
+		end
 		currentAnimTrack = nil
 	end
 	return oldAnim
@@ -250,13 +271,15 @@ function playAnimation(animName, transitionTime, humanoid)
 		
 		if (currentAnimTrack ~= nil) then
 			currentAnimTrack:Stop(transitionTime)
-			currentAnimTrack:Destroy()
+			if not preloadCache[currentAnimInstance] then
+				currentAnimTrack:Destroy()
+			end
 		end
 
 		currentAnimSpeed = 1.0
-	
-		-- load it to the humanoid; get AnimationTrack
-		currentAnimTrack = humanoid:LoadAnimation(anim)
+
+		-- Use pre-loaded track if available, otherwise load on demand
+		currentAnimTrack = preloadCache[anim] or humanoid:LoadAnimation(anim)
 		currentAnimTrack.Priority = Enum.AnimationPriority.Core
 		 
 		-- play the animation

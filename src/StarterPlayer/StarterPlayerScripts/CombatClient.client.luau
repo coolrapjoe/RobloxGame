@@ -56,7 +56,7 @@ local function getAimPosFromOrigin(_originPos: Vector3, maxDist: number): Vector
 	end
 
 	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Blacklist
+	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = { char }
 	params.IgnoreWater = true
 
@@ -287,6 +287,8 @@ local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos
 	local brakeTraveled   = 0
 
 	local function diePredicted()
+		local smoke = ball:FindFirstChild("Smoke", true)
+		if smoke then smoke.Parent = workspace.MapObjects.Pavement end
 		for _, inst in ipairs(ball:GetDescendants()) do
 			if inst:IsA("BasePart") then inst.Transparency = 1 end
 		end
@@ -501,19 +503,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		local now = os.clock()
 		if now >= nextBrickPredictAt then
 			nextBrickPredictAt = now + BRICK_PREDICT_CD
-			warn("[BrickClient] PREDICT allowed  nextAt=" .. string.format("%.3f", nextBrickPredictAt))
 			spawnPredictedBrick(player.UserId, shotId, originPos, aimPos)
-		else
-			warn("[BrickClient] PREDICT blocked  remaining=" .. string.format("%.2f", nextBrickPredictAt - now) .. "s")
 		end
 	elseif moveName == "Fireball" then
 		local now = os.clock()
 		if now >= nextFireballAt then
 			nextFireballAt = now + FIREBALL_CD
-			warn("[FireballClient] PREDICT allowed  nextAt=" .. string.format("%.3f", nextFireballAt))
 			spawnPredictedFireball(shotId, originPos, aimPos)
-		else
-			warn("[FireballClient] PREDICT blocked  remaining=" .. string.format("%.2f", nextFireballAt - now) .. "s")
 		end
 	end
 

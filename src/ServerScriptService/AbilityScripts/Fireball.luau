@@ -6,7 +6,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local DEBUG = true
+local DEBUG = false
 local function sfb(...)
 	if DEBUG then
 		local parts = { "[Fireball]" }
@@ -48,15 +48,6 @@ local FIREBALL_TEMPLATE = ReplicatedStorage:WaitForChild("Projectiles"):WaitForC
 
 -- cooldowns[player]["Fireball"] = readyTime
 local cooldowns: {[Player]: {[string]: number}} = {}
-
-local function isOnCooldown(player: Player, key: string, cooldownSeconds: number): boolean
-	cooldowns[player] = cooldowns[player] or {}
-	local now = os.clock()
-	local t = cooldowns[player][key] or 0
-	if now < t then return true end
-	cooldowns[player][key] = now + cooldownSeconds
-	return false
-end
 
 local function getAliveCharacter(player: Player)
 	local char = player.Character
@@ -130,10 +121,12 @@ end
 local function disableParticleEmitters(m: Model): number
 	local maxLife = 0
 	for _, inst in ipairs(m:GetDescendants()) do
-		if inst:IsA("ParticleEmitter") then
+		if inst.Name == "Particles" then
 			inst.Enabled = false
 			local lifeMax = inst.Lifetime.Max
 			if lifeMax > maxLife then maxLife = lifeMax end
+		elseif inst.Name == "Particles2" then
+			inst:Destroy()
 		end
 	end
 	return maxLife
@@ -297,6 +290,8 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 	local brakeTraveled = 0
 
 	local function dieWithParticlesAndDestroy()
+		local smoke = ball:FindFirstChild("Smoke", true)
+		if smoke then smoke.Parent = workspace.MapObjects.Pavement end
 		hideVisualParts(ball)
 		local maxParticleLife = disableParticleEmitters(ball)
 		task.delay(maxParticleLife + EXTRA_DESTROY_BUFFER, function()
@@ -427,10 +422,11 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 							-- destroyed without cutting anything off mid-life.
 							cloned.Enabled          = false
 							cloned.EmissionDirection = Enum.NormalId.Top
-							cloned.Parent           = host
-							cloned.Size = NumberSequence.new(5,8)
-							cloned.Speed = NumberRange.new(11)
+							cloned.Parent = host
+							cloned.Size = NumberSequence.new(6,8)
+							cloned.Speed = NumberRange.new(10)
 							cloned.SpreadAngle = Vector2.new(-25,25)
+							cloned.Transparency = NumberSequence.new(0.9,1)
 							cloned:Emit(SMOKE_EMIT_COUNT)
 							if cloned.Lifetime.Max > maxLife then maxLife = cloned.Lifetime.Max end
 						end
