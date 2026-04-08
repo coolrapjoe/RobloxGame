@@ -214,6 +214,14 @@ end)
 -- ============================================================
 
 local FIREBALL_CD = 1  -- must match server COOLDOWN in Fireball.luau
+
+local ABILITY_COST = {
+	Fireball = 1,
+	Meteor = 1,
+	BrickThrow = 1,
+	BoxPunch = 0,
+	SwordSlash = 0,
+}
 local nextFireballAt = 0
 
 local PRED_START_SPEED = 50
@@ -287,22 +295,8 @@ local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos
 	local brakeTraveled   = 0
 
 	local function diePredicted()
-		local particles = ball:FindFirstChild("Particles", true)
-		if particles then particles.Parent = workspace.MapObjects.Pavement end
-		for _, inst in ipairs(ball:GetDescendants()) do
-			if inst:IsA("BasePart") then inst.Transparency = 1 end
-		end
-		local maxLife = 0
-		for _, inst in ipairs(ball:GetDescendants()) do
-			if inst:IsA("ParticleEmitter") then
-				inst.Enabled = false
-				if inst.Lifetime.Max > maxLife then maxLife = inst.Lifetime.Max end
-			end
-		end
 		predictedFireballById[shotId] = nil
-		task.delay(maxLife + 0.15, function()
-			if ball and ball.Parent then ball:Destroy() end
-		end)
+		ball:Destroy()
 	end
 
 	local conn
@@ -478,15 +472,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	local maxAmmo = player:FindFirstChild("MaxAmmo")
 	local useAmmo = player:FindFirstChild("UseAmmo")
 
-	local COST = {
-		Fireball = 1,
-		Meteor = 1,
-		BrickThrow = 1,
-		BoxPunch = 0,
-		SwordSlash = 0,
-	}
-
-	local cost = COST[moveName] or 0
+	local cost = ABILITY_COST[moveName] or 0
 	if cost > 0 and ammo and maxAmmo and useAmmo then
 		if useAmmo.Value == false then
 			if ammo.Value ~= maxAmmo.Value then
