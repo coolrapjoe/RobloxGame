@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find C:/RobloxGame/src -type f -name *.lua -o -name *.ts -o -name *.js)"
+      "Bash(find C:/RobloxGame/src -type f -name *.lua -o -name *.ts -o -name *.js)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)"
     ]
   }
 }

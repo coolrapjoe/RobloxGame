@@ -26,7 +26,7 @@ local DAMAGE = 22.5
 
 local BRAKE_TIME = 0.20
 local BRAKE_DISTANCE = 5
-local EXTRA_DESTROY_BUFFER = 0.15
+local EXTRA_DESTROY_BUFFER = 2
 
 local HIT_FLASH_TIME = 0.12
 local HIT_FADE_TIME = 0.25
@@ -290,12 +290,13 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 	local brakeTraveled = 0
 
 	local function dieWithParticlesAndDestroy()
-		local smoke = ball:FindFirstChild("Smoke", true)
-		if smoke then smoke.Parent = workspace.MapObjects.Pavement end
 		hideVisualParts(ball)
 		local maxParticleLife = disableParticleEmitters(ball)
+		local particles = ball:FindFirstChild("Particles", true)
+		if particles then particles.Parent = workspace.MapObjects.Pavement end
 		task.delay(maxParticleLife + EXTRA_DESTROY_BUFFER, function()
 			if ball and ball.Parent then ball:Destroy() end
+			if particles and particles.Parent then particles:Destroy() end
 		end)
 	end
 

@@ -287,8 +287,8 @@ local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos
 	local brakeTraveled   = 0
 
 	local function diePredicted()
-		local smoke = ball:FindFirstChild("Smoke", true)
-		if smoke then smoke.Parent = workspace.MapObjects.Pavement end
+		local particles = ball:FindFirstChild("Particles", true)
+		if particles then particles.Parent = workspace.MapObjects.Pavement end
 		for _, inst in ipairs(ball:GetDescendants()) do
 			if inst:IsA("BasePart") then inst.Transparency = 1 end
 		end

@@ -4,9 +4,9 @@
     "$className": "DataModel",
     "Lighting": {
       "$properties": {
-        "GlobalShadows": true,
-        "Brightness": 2,
         "Outlines": false,
+        "Brightness": 2,
+        "GlobalShadows": true,
         "Technology": "Voxel",
         "Ambient": [0, 0, 0]
       }
