@@ -117,18 +117,16 @@ local function hideVisualParts(m: Model)
 	end
 end
 
-local function disableParticleEmitters(m: Model): number
-	local maxLife = 0
+local function disableParticleEmitters(m: Model)
 	for _, inst in ipairs(m:GetDescendants()) do
-		if inst.Name == "Particles" then
-			inst.Enabled = false
-			local lifeMax = inst.Lifetime.Max
-			if lifeMax > maxLife then maxLife = lifeMax end
-		elseif inst.Name == "Particles2" then
-			inst:Destroy()
+		if inst:IsA("ParticleEmitter") then
+			if inst.Name == "Particles2" then
+				inst:Destroy()
+			else
+				inst.Enabled = false
+			end
 		end
 	end
-	return maxLife
 end
 
 local function scaledNumberSequence(ns: NumberSequence, mult: number): NumberSequence
@@ -289,17 +287,11 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 	local brakeTraveled = 0
 
 	local function dieWithParticlesAndDestroy()
-		local particles = ball:FindFirstChild("Particles", true)
-		if particles then
-			particles.Parent = workspace.MapObjects
-			particles.Enabled = false
-			task.delay(3, function()
-				particles:Destroy()
-			end)
-		end
 		hideVisualParts(ball)
 		disableParticleEmitters(ball)
-		ball:Destroy()
+		task.delay(3, function()
+			if ball and ball.Parent then ball:Destroy() end
+		end)
 	end
 
 	sfb("spawn", "shotId=", shotId, "pos=", startPos, "dir=", dir)
