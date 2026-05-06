@@ -6,9 +6,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local DEBUG = false
+local DEBUG = true
 local function sfb(...)
 	if DEBUG then
+		print("[FB-SVR]", ...)
 	end
 end
 
@@ -226,9 +227,13 @@ local function applyFireSlow(hum: Humanoid)
 end
 
 local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos: any)
+	sfb("spawnFireball called", player.Name, "shotId=", shotId)
 	local char, hum, hrp = getAliveCharacter(player)
-	if not char then return end
-	if isOnCooldown(player, "Fireball", COOLDOWN) then return end
+	if not char then sfb("spawnFireball ABORT: no alive char") return end
+	if isOnCooldown(player, "Fireball", COOLDOWN) then
+		sfb("spawnFireball ABORT: on cooldown (shouldnt happen from Cast)")
+		return
+	end
 
 	applyFireSlow(hum)
 
@@ -246,13 +251,16 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 
 	local startPos = clientPos + Vector3.new(0, 2, 0) + dir * 4
 
+	sfb("spawning FireballShot", "shotId=", shotId, "startPos=", startPos, "dir=", dir)
 	local ball = FIREBALL_TEMPLATE:Clone()
 	ball.Name = "FireballShot"
 	ball:SetAttribute("OwnerUserId", player.UserId)
 	if typeof(shotId) == "string" then
 		ball:SetAttribute("ShotId", shotId)
 	end
+	sfb("FireballShot attributes set, parenting to workspace")
 	ball.Parent = workspace
+	sfb("FireballShot parented, descendant count=", #ball:GetDescendants())
 
 	setProjectilePartSettings(ball)
 
@@ -386,23 +394,25 @@ end)
 local Fireball = {}
 
 function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
-	-- if on cooldown / dead / etc, DON'T fire and return false
+	sfb("Cast called", player.Name, "shotId=", shotId, "t=", os.clock())
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
 	if not hum or not hrp or hum.Health <= 0 then
+		sfb("Cast REJECT: dead/no char")
 		return false
 	end
 	if isOnCooldown(player, "Fireball", COOLDOWN) then
+		sfb("Cast REJECT: on cooldown, readyAt=", cooldowns[player] and cooldowns[player]["Fireball"])
 		return false
 	end
 
-	-- we "reserved" the cooldown above, so call the original spawner
-	-- but we must avoid it cooldown-checking again, so refund the cooldown it just set:
+	sfb("Cast passed cooldown check, resetting to 0 then delegating to spawnFireball")
 	cooldowns[player] = cooldowns[player] or {}
 	cooldowns[player]["Fireball"] = 0
 
 	spawnFireball(player, shotId, originPos, aimPos)
+	sfb("Cast done for shotId=", shotId)
 	return true
 end
 
