@@ -6,10 +6,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local DEBUG = false
+local DEBUG = true
 local function sfb(...)
 	if DEBUG then
-		local parts = { "[Fireball]" }
+		local parts = { "[FB-SVR]" }
 		for _, v in ipairs({ ... }) do
 			parts[#parts + 1] = tostring(v)
 		end
@@ -241,6 +241,7 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 
 	local startPos = clientPos + Vector3.new(0, 2, 0) + dir * 4
 
+	sfb("spawning ball", "shotId=" .. tostring(shotId), "startPos=" .. tostring(startPos), "dir=" .. tostring(dir))
 	local ball = FIREBALL_TEMPLATE:Clone()
 	ball.Name = "FireballShot"
 	ball:SetAttribute("OwnerUserId", player.UserId)
@@ -248,6 +249,7 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		ball:SetAttribute("ShotId", shotId)
 	end
 	ball.Parent = workspace
+	sfb("ball parented, childCount=" .. tostring(#ball:GetChildren()) .. " descCount=" .. tostring(#ball:GetDescendants()))
 
 	setProjectilePartSettings(ball)
 
@@ -450,6 +452,7 @@ end)
 local Fireball = {}
 
 function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
+	sfb("Cast called", player.Name, "shotId=" .. tostring(shotId), "t=" .. string.format("%.3f", os.clock()))
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -470,6 +473,7 @@ function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
 	sfb("FIRE allowed", player.Name, "nextReadyAt=" .. string.format("%.3f", now + COOLDOWN))
 
 	spawnFireball(player, shotId, originPos, aimPos)
+	sfb("Cast done shotId=" .. tostring(shotId))
 	return true
 end
 
