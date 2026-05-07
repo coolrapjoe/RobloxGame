@@ -11,13 +11,13 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local selectCharacter = Remotes:WaitForChild("SelectCharacter")
 local selectAck = Remotes:WaitForChild("SelectCharacterAck")
 
-local CAMERA_CENTER_PART_NAME = "CameraCenter"
-local RADIUS = 375
-local HEIGHT = 130
-local LOOK_Y_OFFSET = 8
-local SPEED_RAD_PER_SEC = 0.05
-local SELECT_FOV = 45
-local PLAY_FOV = 67
+local RADIUS = 200
+local HEIGHT = 0                -- pure vertical offset of the whole orbit rig
+local PITCH_OFFSET_DEG = 20       -- angle the camera looks down at the center (0 = level, 90 = top-down)
+local LOOK_Y_OFFSET = 0
+local SPEED_RAD_PER_SEC = 0.03
+local SELECT_FOV = 50
+local PLAY_FOV = 85
 local SMOOTHING = 10
 
 local RANDOM_CHOICES = { "Wizard", "Boxer", "Brick", "Knight" }
@@ -29,12 +29,10 @@ local OFF_LEFT   = UDim2.new(-1, 0, 0, -40)
 local OFF_RIGHT  = UDim2.new(1, 0, 0, -40)
 
 local function getCenterPosition(): Vector3
-	local map = workspace:FindFirstChild("MapObjects")
+	local map = workspace:FindFirstChild("Map 1")
 	if map then
-		local c = map:FindFirstChild(CAMERA_CENTER_PART_NAME)
-		if c and c:IsA("BasePart") then
-			return c.Position
-		end
+		local c = map:FindFirstChild("CenterPart")
+		return c.Position
 	end
 	local base = workspace:FindFirstChild("Baseplate") or workspace:FindFirstChildWhichIsA("BasePart")
 	return base and base.Position or Vector3.new(0, 0, 0)
@@ -90,10 +88,23 @@ local function startPan()
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.FieldOfView = SELECT_FOV
 
+	-- RADIUS = horizontal distance from center
+	-- PITCH_OFFSET_DEG = how much the camera looks down at the center
+	-- HEIGHT = vertical offset applied to BOTH camera and look target,
+	--          so it slides the whole rig up/down without changing angle
+	local pitchRad = math.rad(PITCH_OFFSET_DEG)
+	local horizRadius = RADIUS * math.cos(pitchRad)
+	local vertFromPitch = RADIUS * math.sin(pitchRad)
+
 	panConn = RunService.RenderStepped:Connect(function(dt)
 		local t = (os.clock() - t0) * SPEED_RAD_PER_SEC
-		local pos = center + Vector3.new(math.cos(t) * RADIUS, HEIGHT, math.sin(t) * RADIUS)
-		local target = CFrame.new(pos, center + Vector3.new(0, LOOK_Y_OFFSET, 0))
+		local pos = center + Vector3.new(
+			math.cos(t) * horizRadius,
+			vertFromPitch + HEIGHT,
+			math.sin(t) * horizRadius
+		)
+		local lookAt = center + Vector3.new(0, LOOK_Y_OFFSET + HEIGHT, 0)
+		local target = CFrame.new(pos, lookAt)
 
 		if SMOOTHING > 0 then
 			local a = 1 - math.exp(-SMOOTHING * dt)
@@ -114,9 +125,9 @@ end
 
 local selectingLocal = false
 local busyPick = false
-local BackgroundScreen: Frame? = nil -- tween cover
-local mainFrame: Frame? = nil        -- buttons holder (Background.Frame)
-local BackgroundFrame: Frame? = nil  -- Background (should be hidden too)
+local BackgroundScreen: Frame? = nil
+local mainFrame: Frame? = nil
+local BackgroundFrame: Frame? = nil
 
 local function findUIRefs()
 	local gui = resolveCharacterUI()
@@ -127,21 +138,18 @@ local function findUIRefs()
 		return nil, nil, nil
 	end
 
-	-- Background (backdrop)
 	local bg = gui:FindFirstChild("Background")
 	BackgroundFrame = (bg and bg:IsA("Frame")) and bg or nil
 
-	-- Buttons in Background.Frame
 	local frame: Frame? = nil
 	if BackgroundFrame then
-		local f = BackgroundFrame:FindFirstChild("Frame")
+		local f = BackgroundFrame:FindFirstChild("Characters")
 		if f and f:IsA("Frame") then
 			frame = f
 		end
 	end
 	mainFrame = frame
 
-	-- Cover tween frame: BackgroundScreen (either at root or under Background)
 	local bs = gui:FindFirstChild("BackgroundScreen")
 	if not (bs and bs:IsA("Frame")) and BackgroundFrame then
 		bs = BackgroundFrame:FindFirstChild("BackgroundScreen")
@@ -205,11 +213,9 @@ local function startSelectionMode()
 	local gui, frame, bs = findUIRefs()
 	if gui then gui.Enabled = true end
 
-	-- show background + buttons
 	if BackgroundFrame then BackgroundFrame.Visible = true end
 	if frame then frame.Visible = true end
 
-	-- reset cover off-left (hidden until pick)
 	if bs then
 		resetBackgroundScreen(bs)
 	end
@@ -311,9 +317,6 @@ local function bindButtons()
 	if knightBtn and knightBtn:IsA("GuiButton") then
 		table.insert(buttonConns, knightBtn.Activated:Connect(function() playPickSequence("Knight") end))
 	end
-	if knightBtn and knightBtn:IsA("GuiButton") then
-		table.insert(buttonConns, knightBtn.Activated:Connect(function() playPickSequence("Knight") end))
-	end
 	if randomBtn and randomBtn:IsA("GuiButton") then
 		table.insert(buttonConns, randomBtn.Activated:Connect(function()
 			playPickSequence(RANDOM_CHOICES[math.random(1, #RANDOM_CHOICES)])
@@ -330,7 +333,6 @@ selectAck.OnClientEvent:Connect(function()
 		return
 	end
 
-	-- hide buttons + background immediately on ack
 	if frame then frame.Visible = false end
 	if BackgroundFrame then BackgroundFrame.Visible = false end
 

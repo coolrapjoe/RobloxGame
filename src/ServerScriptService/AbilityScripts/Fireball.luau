@@ -6,10 +6,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local DEBUG = true
+local DEBUG = false
 local function sfb(...)
 	if DEBUG then
-		local parts = { "[FB-SVR]" }
+		local parts = { "[Fireball]" }
 		for _, v in ipairs({ ... }) do
 			parts[#parts + 1] = tostring(v)
 		end
@@ -23,6 +23,13 @@ local START_SPEED = 50
 local ACCEL = 250
 local LIFETIME = 1.75
 local DAMAGE = 22.5
+
+local CAST_SOUNDS = {
+	"rbxassetid://101485035067883",
+	"rbxassetid://85998279500440",
+	"rbxassetid://108864000747313",
+}
+local soundIndex: {[Player]: number} = {}
 
 local BRAKE_TIME = 0.20
 local BRAKE_DISTANCE = 5
@@ -241,7 +248,6 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 
 	local startPos = clientPos + Vector3.new(0, 2, 0) + dir * 4
 
-	sfb("spawning ball", "shotId=" .. tostring(shotId), "startPos=" .. tostring(startPos), "dir=" .. tostring(dir))
 	local ball = FIREBALL_TEMPLATE:Clone()
 	ball.Name = "FireballShot"
 	ball:SetAttribute("OwnerUserId", player.UserId)
@@ -249,7 +255,6 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		ball:SetAttribute("ShotId", shotId)
 	end
 	ball.Parent = workspace
-	sfb("ball parented, childCount=" .. tostring(#ball:GetChildren()) .. " descCount=" .. tostring(#ball:GetDescendants()))
 
 	setProjectilePartSettings(ball)
 
@@ -265,6 +270,17 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		ball:Destroy()
 		return
 	end
+
+	-- Cycle through cast sound effects
+	local idx = ((soundIndex[player] or 0) % #CAST_SOUNDS) + 1
+	soundIndex[player] = idx
+	local castSound = Instance.new("Sound")
+	castSound.SoundId = CAST_SOUNDS[idx]
+	castSound.Volume = 1
+	castSound.RollOffMaxDistance = 80
+	castSound.Parent = primary
+	castSound:Play()
+	game:GetService("Debris"):AddItem(castSound, 5)
 
 	local pivotCF = CFrame.new(startPos, startPos + dir)
 	ball:PivotTo(pivotCF)
@@ -447,12 +463,12 @@ end
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	cooldowns[player] = nil
+	soundIndex[player] = nil
 end)
 
 local Fireball = {}
 
 function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
-	sfb("Cast called", player.Name, "shotId=" .. tostring(shotId), "t=" .. string.format("%.3f", os.clock()))
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -473,7 +489,6 @@ function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
 	sfb("FIRE allowed", player.Name, "nextReadyAt=" .. string.format("%.3f", now + COOLDOWN))
 
 	spawnFireball(player, shotId, originPos, aimPos)
-	sfb("Cast done shotId=" .. tostring(shotId))
 	return true
 end
 

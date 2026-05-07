@@ -1,0 +1,1 @@
+-- Overrides the default Roblox Health script to disable auto-regeneration.
