@@ -1,5 +1,7 @@
 local SoundService = game:GetService("SoundService")
 
+local MUSIC_VOLUME = 0.4
+
 local songsFolder = SoundService:WaitForChild("Songs")
 
 local playlist = {}
@@ -49,6 +51,7 @@ local function playNext()
 
 	local song = playlist[currentIndex]
 	lastPlayedSong = song
+	song.Volume = MUSIC_VOLUME
 	song.TimePosition = 0
 	song:Play()
 

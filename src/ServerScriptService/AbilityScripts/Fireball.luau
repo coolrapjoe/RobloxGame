@@ -24,6 +24,13 @@ local ACCEL = 250
 local LIFETIME = 1.75
 local DAMAGE = 22.5
 
+local CAST_SOUNDS = {
+	"rbxassetid://101485035067883",
+	"rbxassetid://85998279500440",
+	"rbxassetid://108864000747313",
+}
+local soundIndex: {[Player]: number} = {}
+
 local BRAKE_TIME = 0.20
 local BRAKE_DISTANCE = 5
 
@@ -264,6 +271,17 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		return
 	end
 
+	-- Cycle through cast sound effects
+	local idx = ((soundIndex[player] or 0) % #CAST_SOUNDS) + 1
+	soundIndex[player] = idx
+	local castSound = Instance.new("Sound")
+	castSound.SoundId = CAST_SOUNDS[idx]
+	castSound.Volume = 1
+	castSound.RollOffMaxDistance = 80
+	castSound.Parent = primary
+	castSound:Play()
+	game:GetService("Debris"):AddItem(castSound, 5)
+
 	local pivotCF = CFrame.new(startPos, startPos + dir)
 	ball:PivotTo(pivotCF)
 
@@ -445,6 +463,7 @@ end
 
 Players.PlayerRemoving:Connect(function(player: Player)
 	cooldowns[player] = nil
+	soundIndex[player] = nil
 end)
 
 local Fireball = {}

@@ -142,6 +142,7 @@ end
 local METEOR_TEMPLATE = ReplicatedStorage:WaitForChild("Projectiles"):WaitForChild("Meteor")
 local readyAt: {[Player]: number} = {}
 
+
 local function canUse(player: Player): boolean
 	local now = os.clock()
 	local t = readyAt[player] or 0
@@ -829,6 +830,14 @@ local function spawnMeteor(player: Player, shotId: any): boolean
 	if typeof(shotId) == "string" then meteor:SetAttribute("ShotId", shotId) end
 	meteor.Parent = workspace
 
+	local summonSound = Instance.new("Sound")
+	summonSound.SoundId = "rbxassetid://123038829119440"
+	summonSound.Volume = 10
+	summonSound.RollOffMaxDistance = 200
+	summonSound.Parent = workspace.Terrain
+	summonSound:Play()
+	game:GetService("Debris"):AddItem(summonSound, 10)
+
 	local hitbox = pickHitbox(meteor)
 	if not hitbox then
 		meteor:Destroy()
@@ -1116,6 +1125,14 @@ local function spawnMeteor(player: Player, shotId: any): boolean
 			impacted = true
 			impactPosSaved = targetPos
 			buryStopAt = os.clock() + S.BURY_TIME
+
+			local impactSound = Instance.new("Sound")
+			impactSound.SoundId = "rbxassetid://126734270663620"
+			impactSound.Volume = 8
+			impactSound.RollOffMaxDistance = 200
+			impactSound.Parent = workspace.Terrain
+			impactSound:Play()
+			game:GetService("Debris"):AddItem(impactSound, 10)
 
 			if S.EXPLOSION_ENABLED then
 				preppedBlastFx, preppedOuterFx = prepImpactExplosion(meteor, impactPosSaved)

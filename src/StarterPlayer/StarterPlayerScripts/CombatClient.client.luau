@@ -23,10 +23,15 @@ local fireballTemplate = ReplicatedStorage:WaitForChild("Projectiles"):WaitForCh
 
 local MAX_DIST = 600
 
+local brickUltSound = Instance.new("Sound")
+brickUltSound.SoundId = "rbxassetid://119310967434859"
+brickUltSound.Volume = 10
+brickUltSound.Parent = workspace.Terrain
+
 local ClientLoadouts = {
 	Wizard = { Primary = "Fireball", Special = "Meteor" },
 	Boxer = { Primary = "BoxPunch", Special = "BoxPunch" },
-	Brick = { Primary = "BrickThrow", Special = "BrickThrow" },
+	Brick = { Primary = "BrickThrow", Special = "BrickUltimate" },
 	Knight = { Primary = "SwordSlash", Special = "SwordSlash" },
 }
 
@@ -196,6 +201,23 @@ local function spawnPredictedBrick(ownerUserId: number, shotId: string, originPo
 end
 
 abilityPredict.OnClientEvent:Connect(function(abilityName, ownerUserId, shotId, originPos, aimPos)
+	if abilityName == "BrickUltSound" then
+		brickUltSound:Play()
+		return
+	end
+	if abilityName == "BrickUltAnim" then
+		local animId = ownerUserId  -- repurposed arg carries the registered anim ID
+		local char = player.Character
+		if not char then return end
+		local animator = char:FindFirstChildOfClass("Humanoid")
+			and char:FindFirstChildOfClass("Humanoid"):FindFirstChildOfClass("Animator")
+		if not animator then return end
+		local anim = Instance.new("Animation")
+		anim.AnimationId = animId
+		local track = animator:LoadAnimation(anim)
+		track:Play()
+		return
+	end
 	if abilityName ~= "BrickThrow" then return end
 	if typeof(ownerUserId) ~= "number" then return end
 	if typeof(shotId) ~= "string" then return end
@@ -219,6 +241,7 @@ local ABILITY_COST = {
 	Fireball = 1,
 	Meteor = 1,
 	BrickThrow = 1,
+	BrickUltimate = 0,
 	BoxPunch = 0,
 	SwordSlash = 0,
 }

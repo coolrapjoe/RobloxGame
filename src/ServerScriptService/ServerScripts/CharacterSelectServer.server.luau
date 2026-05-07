@@ -22,8 +22,8 @@ end
 local Allowed = { Wizard = true, Boxer = true, Brick = true, Knight = true }
 
 local Objects = workspace:WaitForChild("Objects")
-local P1 = Objects:WaitForChild("P1Spawn")
-local P2 = Objects:WaitForChild("P2Spawn")
+local P1 = Objects:WaitForChild("P1Spawn"):WaitForChild("Inner")
+local P2 = Objects:WaitForChild("P2Spawn"):WaitForChild("Inner")
 local SelectSpawn = Objects:FindFirstChild("SelectSpawn") -- optional
 local Spawns = { P1, P2 }
 
