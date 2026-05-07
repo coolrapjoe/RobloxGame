@@ -15,32 +15,34 @@ end
 local AbilityScripts = ServerScriptService:WaitForChild("AbilityScripts")
 local SpecialScripts = ServerScriptService:WaitForChild("SpecialScripts")
 
-local Fireball = require(AbilityScripts:WaitForChild("Fireball"))
-local Meteor = require(SpecialScripts:WaitForChild("Meteor"))
-local BoxPunch = require(AbilityScripts:WaitForChild("BoxerFist"))
-local BrickThrow = require(AbilityScripts:WaitForChild("BrickThrow"))
-local SwordSlash = require(AbilityScripts:WaitForChild("SwordSlash"))
+local Fireball     = require(AbilityScripts:WaitForChild("Fireball"))
+local Meteor       = require(SpecialScripts:WaitForChild("Meteor"))
+local BoxPunch     = require(AbilityScripts:WaitForChild("BoxerFist"))
+local BrickThrow   = require(AbilityScripts:WaitForChild("BrickThrow"))
+local BrickUltimate = require(AbilityScripts:WaitForChild("BrickUltimate"))
+local SwordSlash   = require(AbilityScripts:WaitForChild("SwordSlash"))
 
 local Loadouts = {
-	Wizard = { Primary = Fireball, Special = Meteor },
-	Boxer = { Primary = BoxPunch, Special = BoxPunch },
-	Brick = { Primary = BrickThrow, Special = BrickThrow },
+	Wizard = { Primary = Fireball,   Special = Meteor },
+	Boxer  = { Primary = BoxPunch,   Special = BoxPunch },
+	Brick  = { Primary = BrickThrow, Special = BrickUltimate },
 	Knight = { Primary = SwordSlash, Special = SwordSlash },
 }
 
 local LoadoutNames = {
-	Wizard = { Primary = "Fireball", Special = "Meteor" },
-	Boxer = { Primary = "BoxPunch", Special = "BoxPunch" },
-	Brick = { Primary = "BrickThrow", Special = "BrickThrow" },
+	Wizard = { Primary = "Fireball",   Special = "Meteor" },
+	Boxer  = { Primary = "BoxPunch",   Special = "BoxPunch" },
+	Brick  = { Primary = "BrickThrow", Special = "BrickUltimate" },
 	Knight = { Primary = "SwordSlash", Special = "Dash" },
 }
 
 local AMMO_COST = {
-	Fireball = 1,
-	Meteor = 1,
-	BrickThrow = 1,
-	BoxPunch = 0,
-	SwordSlash = 0,
+	Fireball     = 1,
+	Meteor       = 1,
+	BrickThrow   = 1,
+	BrickUltimate = 3,
+	BoxPunch     = 0,
+	SwordSlash   = 0,
 }
 
 local ROUTER_CD = 0.05

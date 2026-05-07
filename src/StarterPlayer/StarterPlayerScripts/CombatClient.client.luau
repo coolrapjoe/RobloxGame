@@ -11,13 +11,6 @@ local HttpService = game:GetService("HttpService")
 local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 
-local DEBUG_FB = true
-local function fbd(...)
-	if DEBUG_FB then
-		print("[FB-CLT]", ...)
-	end
-end
-
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
@@ -75,15 +68,25 @@ local function yawDir(dir: Vector3): Vector3
 end
 
 local function hideModelLocal(m: Model, hide: boolean)
-	local count = 0
 	for _, inst in ipairs(m:GetDescendants()) do
 		if inst:IsA("BasePart") then
 			inst.LocalTransparencyModifier = hide and 1 or 0
 			inst.CastShadow = not hide
-			count += 1
+		elseif inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam") then
+			inst.Enabled = not hide
+		elseif inst:IsA("Light") then
+			if hide then
+				inst:SetAttribute("_origBrightness", inst.Brightness)
+				inst.Brightness = 0
+			else
+				local orig = inst:GetAttribute("_origBrightness")
+				if type(orig) == "number" then
+					inst.Brightness = orig
+					inst:SetAttribute("_origBrightness", nil)
+				end
+			end
 		end
 	end
-	fbd("hideModelLocal model=", m.Name, "hide=", hide, "parts affected=", count)
 end
 
 -- ============================================================
@@ -245,10 +248,6 @@ local function ensurePrimaryPart(m: Model)
 end
 
 local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos: Vector3): Model?
-	fbd("spawnPredictedFireball shotId=", shotId, "t=", os.clock())
-	if predictedFireballById[shotId] then
-		fbd("WARNING: predictedFireball already exists for shotId=", shotId)
-	end
 	local d = aimPos - originPos
 	local flat = Vector3.new(d.X, 0, d.Z)
 	if flat.Magnitude < 0.01 then
@@ -276,7 +275,6 @@ local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos
 	ball:PivotTo(pivotCF)
 
 	predictedFireballById[shotId] = ball
-	fbd("predicted fireball registered for shotId=", shotId, "startPos=", startPos)
 
 	local castParams = RaycastParams.new()
 	castParams.FilterType = Enum.RaycastFilterType.Exclude
@@ -295,15 +293,15 @@ local function spawnPredictedFireball(shotId: string, originPos: Vector3, aimPos
 	local brakeTraveled   = 0
 
 	local function diePredicted()
-		fbd("diePredicted called for shotId=", shotId, "t=", os.clock())
-		for _, inst in ipairs(ball:GetDescendants()) do
-			if inst:IsA("BasePart") then inst.Transparency = 1 end
-		end
 		local maxLife = 0
 		for _, inst in ipairs(ball:GetDescendants()) do
-			if inst:IsA("ParticleEmitter") then
+			if inst:IsA("BasePart") then
+				inst.Transparency = 1
+			elseif inst:IsA("ParticleEmitter") then
 				inst.Enabled = false
 				if inst.Lifetime.Max > maxLife then maxLife = inst.Lifetime.Max end
+			elseif inst:IsA("Light") then
+				inst.Brightness = 0
 			end
 		end
 		predictedFireballById[shotId] = nil
@@ -416,62 +414,40 @@ workspace.DescendantAdded:Connect(function(inst)
 
 	if inst:IsA("Model") and inst.Name == "FireballShot" and inst:GetAttribute("OwnerUserId") == player.UserId then
 		local shotId = inst:GetAttribute("ShotId")
-		fbd("DescendantAdded: FireballShot arrived shotId=", shotId, "t=", os.clock())
-		fbd("  server ball descendant count=", #inst:GetDescendants())
+		if typeof(shotId) ~= "string" then return end
 
-		if typeof(shotId) ~= "string" then
-			fbd("  WARN: shotId is not a string, type=", typeof(shotId))
-			return
-		end
+		local lateHideConn = inst.DescendantAdded:Connect(function(d)
+			if d:IsA("BasePart") then
+				d.LocalTransparencyModifier = 1
+				d.CastShadow = false
+			elseif d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") then
+				d.Enabled = false
+			elseif d:IsA("Light") then
+				d:SetAttribute("_origBrightness", d.Brightness)
+				d.Brightness = 0
+			end
+		end)
 
 		local predicted = predictedFireballById[shotId]
-		fbd("  predicted lookup: ", predicted ~= nil and "FOUND" or "NOT FOUND", "parentOk=", predicted ~= nil and predicted.Parent ~= nil or false)
-
 		if predicted and predicted.Parent then
-			fbd("  ACTION: hiding server ball, will swap to predicted position")
 			hideModelLocal(inst, true)
-			local partCount = 0
-			for _, d in ipairs(inst:GetDescendants()) do
-				if d:IsA("BasePart") then partCount += 1 end
-			end
-			fbd("  parts hidden immediately:", partCount)
-
 			task.defer(function()
-				if not (inst and inst.Parent) then
-					fbd("  defer: server ball gone before swap, shotId=", shotId)
-					return
-				end
+				lateHideConn:Disconnect()
+				if not (inst and inst.Parent) then return end
 				if not (predicted and predicted.Parent) then
-					fbd("  defer: predicted gone before swap, showing server ball, shotId=", shotId)
 					hideModelLocal(inst, false)
 					return
 				end
-				fbd("  defer: performing swap, shotId=", shotId)
 				pcall(function()
 					inst:PivotTo(predicted:GetPivot())
 				end)
 				predicted:Destroy()
 				predictedFireballById[shotId] = nil
 				hideModelLocal(inst, false)
-				fbd("  defer: swap complete, shotId=", shotId)
 			end)
 		else
-			fbd("  ACTION: no predicted ball, suppressing server ball visually, shotId=", shotId)
-			local partCount = 0
-			for _, d in ipairs(inst:GetDescendants()) do
-				if d:IsA("BasePart") then partCount += 1 end
-			end
-			fbd("  parts to hide:", partCount)
 			hideModelLocal(inst, true)
-			-- Watch for children that arrive after the model (replication lag)
-			local childConn
-			childConn = inst.DescendantAdded:Connect(function(child)
-				if child:IsA("BasePart") then
-					fbd("  LATE child replicated:", child.Name, "setting LocalTransparencyModifier=1, shotId=", shotId)
-					child.LocalTransparencyModifier = 1
-				end
-			end)
-			task.delay(2, function() if childConn then childConn:Disconnect() end end)
+			task.delay(2, function() lateHideConn:Disconnect() end)
 		end
 	end
 end)
@@ -535,17 +511,11 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		end
 	elseif moveName == "Fireball" then
 		local now = os.clock()
-		fbd("InputBegan: Fireball input t=", now, "nextFireballAt=", nextFireballAt, "blocked=", now < nextFireballAt)
-		fbd("  shotId=", shotId, "originPos=", originPos)
 		if now >= nextFireballAt then
 			nextFireballAt = now + FIREBALL_CD
-			fbd("  spawning predicted fireball, nextFireballAt now=", nextFireballAt)
 			spawnPredictedFireball(shotId, originPos, aimPos)
-		else
-			fbd("  BLOCKED by client prediction cooldown, no predicted fireball spawned")
 		end
 	end
 
-	fbd("Firing UseAbility remote: moveName=", moveName, "shotId=", shotId)
 	useAbility:FireServer(slot, shotId, originPos, aimPos, originCF)
 end)

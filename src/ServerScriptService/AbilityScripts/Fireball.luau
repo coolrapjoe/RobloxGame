@@ -6,13 +6,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
-local DEBUG = true
-local function sfb(...)
-	if DEBUG then
-		print("[FB-SVR]", ...)
-	end
-end
-
 -- Config
 local COOLDOWN = 1
 local START_SPEED = 50
@@ -227,13 +220,9 @@ local function applyFireSlow(hum: Humanoid)
 end
 
 local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos: any)
-	sfb("spawnFireball called", player.Name, "shotId=", shotId)
 	local char, hum, hrp = getAliveCharacter(player)
-	if not char then sfb("spawnFireball ABORT: no alive char") return end
-	if isOnCooldown(player, "Fireball", COOLDOWN) then
-		sfb("spawnFireball ABORT: on cooldown (shouldnt happen from Cast)")
-		return
-	end
+	if not char then return end
+	if isOnCooldown(player, "Fireball", COOLDOWN) then return end
 
 	applyFireSlow(hum)
 
@@ -251,16 +240,13 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 
 	local startPos = clientPos + Vector3.new(0, 2, 0) + dir * 4
 
-	sfb("spawning FireballShot", "shotId=", shotId, "startPos=", startPos, "dir=", dir)
 	local ball = FIREBALL_TEMPLATE:Clone()
 	ball.Name = "FireballShot"
 	ball:SetAttribute("OwnerUserId", player.UserId)
 	if typeof(shotId) == "string" then
 		ball:SetAttribute("ShotId", shotId)
 	end
-	sfb("FireballShot attributes set, parenting to workspace")
 	ball.Parent = workspace
-	sfb("FireballShot parented, descendant count=", #ball:GetDescendants())
 
 	setProjectilePartSettings(ball)
 
@@ -305,8 +291,6 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		end)
 	end
 
-	sfb("spawn", "shotId=", shotId, "pos=", startPos, "dir=", dir)
-
 	local conn
 	conn = RunService.Heartbeat:Connect(function(dt)
 		if not alive then return end
@@ -347,7 +331,6 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 			if a >= 1 or step <= 0.0001 then
 				alive = false
 				if conn then conn:Disconnect() end
-				sfb("expire", "shotId=", shotId)
 				dieWithParticlesAndDestroy()
 				return
 			end
@@ -363,8 +346,6 @@ local function spawnFireball(player: Player, shotId: any, originPos: any, aimPos
 		if result then
 			alive = false
 			if conn then conn:Disconnect() end
-
-			sfb("hit", "shotId=", shotId, "hit=", result.Instance:GetFullName())
 
 			local targetHum = findHumanoidFromHit(result.Instance)
 			local hitAPlayer = (targetHum and targetHum ~= hum and targetHum.Health > 0)
@@ -394,25 +375,16 @@ end)
 local Fireball = {}
 
 function Fireball.Cast(player: Player, shotId: any, originPos: any, aimPos: any)
-	sfb("Cast called", player.Name, "shotId=", shotId, "t=", os.clock())
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hum or not hrp or hum.Health <= 0 then
-		sfb("Cast REJECT: dead/no char")
-		return false
-	end
-	if isOnCooldown(player, "Fireball", COOLDOWN) then
-		sfb("Cast REJECT: on cooldown, readyAt=", cooldowns[player] and cooldowns[player]["Fireball"])
-		return false
-	end
+	if not hum or not hrp or hum.Health <= 0 then return false end
+	if isOnCooldown(player, "Fireball", COOLDOWN) then return false end
 
-	sfb("Cast passed cooldown check, resetting to 0 then delegating to spawnFireball")
 	cooldowns[player] = cooldowns[player] or {}
 	cooldowns[player]["Fireball"] = 0
 
 	spawnFireball(player, shotId, originPos, aimPos)
-	sfb("Cast done for shotId=", shotId)
 	return true
 end
 
